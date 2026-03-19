@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Asset Cross-Check Tool</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --danger: #dc3545;
+            --success: #28a745;
+            --bg: #f8f9fa;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background-color: var(--bg); color: #333; }
+        
+        /* Header & Progress Bar */
+        header { background: #fff; padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .logo { font-weight: bold; font-size: 1.2rem; color: var(--primary); }
+        
+        /* Main Layout */
+        main { display: flex; flex: 1; overflow: hidden; padding: 20px; gap: 20px; }
+
+        /* Left Sidebar: Asset List */
+        #asset-sidebar { width: 250px; background: white; border-radius: 8px; border: 1px solid #ddd; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; background: #fdfdfd; }
+        .asset-item { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .asset-item:hover { background: #f0f7ff; }
+        .status-badge { border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; color: white; }
+        .status-err { background: var(--danger); }
+        .status-ok { background: var(--success); }
+
+        /* Center: Workspace */
+        .workspace { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+        /* Drag and Drop Area */
+        #drop-zone { border: 2px dashed var(--primary); border-radius: 8px; background: white; padding: 30px; text-align: center; transition: 0.3s; }
+        #drop-zone.hover { background: #e7f3ff; border-color: #0056b3; }
+
+        /* Comparison Viewer */
+        .viewer-container { display: flex; flex: 1; gap: 15px; min-height: 0; }
+        .pane { flex: 1; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+        .pane-label { padding: 10px; background: #eee; font-weight: bold; font-size: 0.8rem; border-bottom: 1px solid #ddd; }
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; line-height: 1.6; white-space: pre-wrap; }
+
+        /* Highlighting */
+        .highlight-error { background-color: #ffcfcf; border-bottom: 2px solid red; cursor: help; }
+        
+        .footer-actions { padding: 20px; text-align: right; }
+        .btn { padding: 10px 25px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">QA-Match Engine</div>
+    <div id="file-summary">No files loaded</div>
+</header>
+
+<main>
+    <div id="asset-sidebar">
+        <div class="sidebar-header">Asset IDs (Found)</div>
+        <div id="asset-list">
+            <div style="padding: 20px; color: #999; font-size: 0.8rem;">Upload files to see asset list...</div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div id="drop-zone">
+            <h3>Drag & Drop Files Here</h3>
+            <p>.docx Source Bundle + All Working PDFs</p>
+        </div>
+
+        <div class="viewer-container">
+            <div class="pane">
+                <div class="pane-label">SOURCE OF TRUTH (.DOCX)</div>
+                <div class="content-area" id="source-view">Select an asset from the left to view comparison...</div>
+            </div>
+            <div class="pane">
+                <div class="pane-label">WORKING FILE (PDF EXTRACT)</div>
+                <div class="content-area" id="target-view"></div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div class="footer-actions">
+    <button class="btn btn-primary" onclick="generateReport()">Download QA Report</button>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const assetList = document.getElementById('asset-list');
+    const sourceView = document.getElementById('source-view');
+    const targetView = document.getElementById('target-view');
+
+    // Visual feedback for Drag and Drop
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('hover'); };
+    dropZone.ondragleave = () => dropZone.classList.remove('hover');
+    
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('hover');
+        const files = e.dataTransfer.files;
+        processFiles(files);
+    };
+
+    function processFiles(files) {
+        document.getElementById('file-summary').innerText = `Loaded ${files.length} files`;
+        
+        // MOCK DATA: Simulating what the Python backend will return
+        // This allows you to see the UI working immediately.
+        const mockAssets = [
+            { id: '206118', status: 'ERR', src: "The best sandals for spring", target: "The best sandals far <span class='highlight-error' title='Typo found'>sanng</span>" },
+            { id: '206132', status: 'ERR', src: "Shop Veja, Sperry, Birkenstock", target: "Shop <span class='highlight-error'>Vieja</span>, Sperry, <span class='highlight-error'>Birmatock</span>" },
+            { id: '206146', status: 'OK', src: "Ultimate Classic: Samba OG", target: "Ultimate Classic: Samba OG" }
+        ];
+
+        assetList.innerHTML = '';
+        mockAssets.forEach(asset => {
+            const div = document.createElement('div');
+            div.className = 'asset-item';
+            div.innerHTML = `
+                <span>Asset ${asset.id}</span>
+                <span class="status-badge ${asset.status === 'ERR' ? 'status-err' : 'status-ok'}">${asset.status}</span>
+            `;
+            div.onclick = () => {
+                sourceView.innerHTML = asset.src;
+                targetView.innerHTML = asset.target;
+            };
+            assetList.appendChild(div);
+        });
+    }
+
+    function generateReport() {
+        alert("Report logic will be handled by the Python backend.");
+    }
+</script>
+
+</body>
+</html>
